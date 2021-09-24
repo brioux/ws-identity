@@ -37,9 +37,8 @@ export class WsIdentityRouter {
                 return res.sendStatus(403);
             }
         };        
-        const wsPath = process.env.WEB_SOCKET_IDENTITY_PATH || '/sessions';
         const wsIdentityServerOpts: WsIdentityServerOpts = {
-            path: wsPath,
+            path: process.env.WEB_SOCKET_IDENTITY_PATH,
             server: opts.server,
             logLevel: opts.logLevel,
         };

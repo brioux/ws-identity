@@ -55,6 +55,7 @@ export class WsIdentityServer {
       level: opts.logLevel || "INFO",
       label: this.className,
     });
+    this.opts.path = opts.path || '/sessions';
     this.webSocketServer = new WebSocket.Server({
       noServer: true,
       path: opts.path,
