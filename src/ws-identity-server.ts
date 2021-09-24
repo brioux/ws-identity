@@ -61,13 +61,11 @@ export class WsIdentityServer {
       path: opts.path,
       //clientTracking: true,
     });
-    this.hostAddress = this.opts.server.address();
-    this.hostAddress.path = this.opts.path;
-    this.hostAddress.uri = `ws://localhost:${this.hostAddress.port}${this.opts.path}`
+    const address = this.opts.server.address() as any;
+    this.hostAddress = `ws://localhost:${address.port}${this.opts.path}`
     this.log.debug(
-      `${fnTag} setup ws-identity-server at ${this.hostAddress.uri}`,
+      `${fnTag} setup ws-identity-server at ${this.hostAddress.port}`,
     );
-    //Checks.nonBlankString(opts.path, `${fnTag} options.path`);
 
     const { log, clients, webSocketServer } = this;
     opts.server.on("upgrade", function upgrade(
@@ -76,25 +74,27 @@ export class WsIdentityServer {
       head: Buffer,
     ) {
       log.debug(
-        `${fnTag} validation of server upgrade before establishing web-socket connection`,
+        `${fnTag} validate server upgrade before connecting web-socket`,
       );
       try {
         const { path, pathname } = parse(request.url as string);
         const params = path?.split("?")[1];
         if (opts.path && pathname !== opts.path) {
           throw new Error(
-            `incoming web-socket connections directed to ${pathname}, but required path is ${opts.path}`,
+            `incoming web-socket.to ${pathname}, required path is ${opts.path}`,
           );
         }
         const headers = request.headers;
         const connectionParams = new URLSearchParams(params);
-        log.debug(
-          `${fnTag} params received by new web-socket client: ${connectionParams}`,
-        );
-
-        const sessionId = headers.sessionId as string;
-        const signature = headers.signature as string;
-        const curve = headers.crv as ECCurveType;
+        if(connectionParams){
+          log.debug(
+            `${fnTag} params received by new web-socket client: ${connectionParams}`,
+          );
+        }
+        const sessionId = headers['x-session-id'] as string;
+        const signature = headers['x-signature'] as string;
+        const curve = headers['x-crv'] as ECCurveType;
+        console.log(sessionId)
         const paramErrs = [];
         if (!sessionId) {
           paramErrs.push(`header 'sessionId' not provided`);
@@ -122,7 +122,7 @@ export class WsIdentityServer {
         const clientIp = getClientIp(request);
         if(client.ip !== clientIp){
           throw new Error(
-            `session is expecting incoming client with ip ${client.ip} but incoming ip is ${clientIp}`
+            `incoming connectionfrom ip ${clientIp}, but expected ip is ${client.ip}`
           )
         };
         const pubKeyHex: string = client.pubKeyHex;
@@ -157,7 +157,8 @@ export class WsIdentityServer {
         );
       } catch (error) {
         socket.write(`HTTP/1.1 401 Unauthorized\r\n\r\n${error}`);
-        throw new Error(`${fnTag} incoming connection denied: ${error}`);
+        //throw new Error
+        log.error(`${fnTag} incoming connection denied: ${error}`);
         socket.destroy();
       }
     });
