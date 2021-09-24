@@ -1,0 +1,11 @@
+version: "3"
+
+services:
+  app:
+    container_name: app
+    restart: always
+    build: .
+    environment: 
+      - PORT=8700 
+    ports: 
+      - "8700:8700" 

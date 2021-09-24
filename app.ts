@@ -1,6 +1,6 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import bodyParser from "body-parser";
-import { WsIdentityRouter } from './router';
+import { WsIdentityRouter } from './src/router';
 import https from 'https'
 const app: Application = express()
 app.use(bodyParser.json())
