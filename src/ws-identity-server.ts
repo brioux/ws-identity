@@ -62,8 +62,9 @@ export class WsIdentityServer {
     });
     this.hostAddress = this.opts.server.address();
     this.hostAddress.path = this.opts.path;
+    this.hostAddress.uri = `http://localhost:${this.hostAddress.port}${this.opts.path}`
     this.log.debug(
-      `${fnTag} setup web-socket-server for clients of the WS-X.509 identity provider at ${JSON.stringify(this.hostAddress)}} `,
+      `${fnTag} setup ws-identity-server at ${this.hostAddress.uri}`,
     );
     //Checks.nonBlankString(opts.path, `${fnTag} options.path`);
 

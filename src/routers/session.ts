@@ -2,7 +2,7 @@
 import { Logger, LoggerProvider, LogLevelDesc } from '@hyperledger/cactus-common';
 import { Router, Request, Response } from 'express';
 import { query, validationResult, body } from 'express-validator';
-import { WsIdentityServer } from '../web-socket-server';
+import { WsIdentityServer } from '../ws-identity-server';
 import { getClientIp } from '@supercharge/request-ip';
 export interface WsIdentityRouterOpts {
     logLevel: LogLevelDesc;
@@ -23,13 +23,13 @@ export class WsSessionRouter {
     private __registerHandlers() {
         this.router.post(
             '/new',
-            [body('pubKeyHex').isString().notEmpty(),],
+            [body('pubKeyHex').isString().notEmpty()],
             this.newSession.bind(this),
         )
     }
     private async newSession(req: Request, res: Response) {
         const fnTag = `${req.method.toUpperCase()} ${req.originalUrl}`;
-        this.log.info(fnTag);
+        this.log.debug(fnTag);
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             this.log.debug(`${fnTag} bad request : ${JSON.stringify(errors.array())}`);
@@ -40,7 +40,7 @@ export class WsSessionRouter {
         try {
             const clientIp = getClientIp(req);
             const resp = this.opts.wsIdentityServer.newSessionId(req.body.pubKeyHex,clientIp)
-            return res.sendStatus(200);
+            return res.status(201).json(resp);
         } catch (error) {
             return res.status(409).json({
                 msg: error.message,

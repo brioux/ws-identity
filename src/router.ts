@@ -5,7 +5,7 @@ import { query, validationResult, body } from 'express-validator';
 import { 
     WsIdentityServer, 
     WsIdentityServerOpts 
-} from './web-socket-server';
+} from './ws-identity-server';
 import { WsSessionRouter } from './routers/session'
 import { WsClientRouter } from './routers/client'
 export interface WsIdentityRouterOpts {
@@ -24,13 +24,6 @@ export class WsIdentityRouter {
         this.log = LoggerProvider.getOrCreate({ 
             label: this.className, level: opts.logLevel 
         });
-        const wsPath = process.env.WEB_SOCKET_IDENTITY_PATH || '/sessions';
-        const wsIdentityServerOpts: WsIdentityServerOpts = {
-            path: wsPath,
-            server: opts.server,
-            logLevel: opts.logLevel,
-        };
-        const wsIdentityServer = new WsIdentityServer(wsIdentityServerOpts);
         const auth = async (req: Request, res: Response, next) => {    
             const sessionId= req.header('X-SessionId');
             const signature= req.header('X-Signature');
@@ -44,6 +37,13 @@ export class WsIdentityRouter {
                 return res.sendStatus(403);
             }
         };        
+        const wsPath = process.env.WEB_SOCKET_IDENTITY_PATH || '/sessions';
+        const wsIdentityServerOpts: WsIdentityServerOpts = {
+            path: wsPath,
+            server: opts.server,
+            logLevel: opts.logLevel,
+        };
+        const wsIdentityServer = new WsIdentityServer(wsIdentityServerOpts);      
 
         const wsSessionRouter = 
             new WsSessionRouter({
@@ -56,11 +56,11 @@ export class WsIdentityRouter {
                 logLevel: opts.logLevel
             });
         opts.app.use(
-            '/v1/identity',
+            '/v1/identity/session',
             wsSessionRouter.router,
         );
         opts.app.use(
-            '/v1/identity',
+            '/v1/identity/client',
             auth,
             wsClientRouter.router,
         );
