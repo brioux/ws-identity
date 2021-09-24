@@ -63,7 +63,7 @@ export class WsIdentityServer {
     });
     this.hostAddress = this.opts.server.address();
     this.hostAddress.path = this.opts.path;
-    this.hostAddress.uri = `http://localhost:${this.hostAddress.port}${this.opts.path}`
+    this.hostAddress.uri = `ws://localhost:${this.hostAddress.port}${this.opts.path}`
     this.log.debug(
       `${fnTag} setup ws-identity-server at ${this.hostAddress.uri}`,
     );
