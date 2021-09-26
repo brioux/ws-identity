@@ -21,7 +21,7 @@ export class WsSessionRouter {
     }
 
     private __registerHandlers() {
-        this.router.get(
+        this.router.post(
             '/new',
             [body('pubKeyHex').isString().notEmpty()],
             this.newSession.bind(this),

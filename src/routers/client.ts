@@ -2,6 +2,7 @@
 import { Logger, LoggerProvider, LogLevelDesc } from '@hyperledger/cactus-common';
 import { Router, Request, Response } from 'express';
 import { query, validationResult, body } from 'express-validator';
+import { KEYUTIL } from "jsrsasign";
 import { WsIdentityServer } from '../ws-identity-server'
 import { WebSocketClient } from '../web-socket-client'
 
@@ -25,7 +26,7 @@ export class WsClientRouter {
     private __registerHandlers() {
         this.router.post(
             '/sign',
-            [body('digest').isString().notEmpty(),],
+            [body('digest').isString().notEmpty()],
             this.sign.bind(this),
         );
         this.router.get(
@@ -34,7 +35,6 @@ export class WsClientRouter {
         );
     }
     private async sign(req: Request, res: Response) {
-        console.log(req)
         const fnTag = `${req.method.toUpperCase()} ${req.originalUrl}`;
         this.log.info(fnTag);
         const errors = validationResult(req);
@@ -45,11 +45,11 @@ export class WsClientRouter {
             });
         }
         try {
-            console.log(req.body);
-            const digest = Buffer.from(req.body.digest,'base64');
+            const digest = Buffer.from(req.body.digest, "base64");
             const resp = await (req as any).client.sign(digest);
-            return res.status(200).json(resp);
+            return res.status(200).json(resp.toString("base64"));
         } catch (error) {
+            this.log.debug(`${error}`)
             return res.status(409).json({
                 msg: error.message,
             });
@@ -67,9 +67,10 @@ export class WsClientRouter {
             });
         }
         try {
-            const resp = (req as any).client.pubKeyEcdsa
+            const resp = KEYUTIL.getPEM((req as any).client.pubKeyEcdsa);
             return res.status(200).json(resp);
         } catch (error) {
+            console.log(error)
             return res.status(409).json({
                 msg: error.message,
             });

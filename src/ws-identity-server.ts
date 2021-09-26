@@ -4,20 +4,24 @@ import {
   LoggerProvider,
 } from "@hyperledger/cactus-common";
 import WebSocket from "ws";
-import { KJUR } from "jsrsasign";
+import { KJUR, KEYUTIL } from "jsrsasign";
 import { parse, URLSearchParams } from "url";
 import { randomBytes } from "crypto";
 import http, { Server } from "http";
 import net from "net";
 import { 
   WebSocketClient, 
-  WSClientOpts,
-  ECCurveType  } from "./web-socket-client";
+  WSClientOpts  } from "./web-socket-client";
 import { getClientIp } from '@supercharge/request-ip';
 
 export enum ECCurveLong {
   p256 = "secp256r1",
   p384 = "secp384r1",
+}
+
+export enum ECCurveType {
+  P256 = "p256",
+  P384 = "p384",
 }
 
 export interface WsIdentityServerOpts {
@@ -64,7 +68,7 @@ export class WsIdentityServer {
     const address = this.opts.server.address() as any;
     this.hostAddress = `ws://localhost:${address.port}${this.opts.path}`
     this.log.debug(
-      `${fnTag} setup ws-identity-server at ${this.hostAddress.port}`,
+      `${fnTag} setup ws-identity-server at ${this.hostAddress}`,
     );
 
     const { log, clients, webSocketServer } = this;
@@ -93,17 +97,17 @@ export class WsIdentityServer {
         }
         const sessionId = headers['x-session-id'] as string;
         const signature = headers['x-signature'] as string;
-        const curve = headers['x-crv'] as ECCurveType;
-        console.log(sessionId)
+        const pubKeyPem = JSON.parse(headers['x-pub-key-pem'] as string) as object;
+
         const paramErrs = [];
         if (!sessionId) {
-          paramErrs.push(`header 'sessionId' not provided`);
+          paramErrs.push(`header 'session-id' not provided`);
         }
         if (!signature) {
           paramErrs.push(`header 'signature' not provided`);
         }
-        if (!curve) {
-          paramErrs.push(`header 'curve' not provided`);
+        if (!pubKeyPem) {
+          paramErrs.push(`header 'pub-key-pem' not provided`);
         }
         if (paramErrs.length > 0) {
           throw new Error(paramErrs.join("\r\n"));
@@ -132,10 +136,7 @@ export class WsIdentityServer {
             12,
           )}... to verify the sessionId signature`,
         );
-        const pubKeyEcdsa = new KJUR.crypto.ECDSA({
-          curve: ECCurveLong[curve],
-          pub: pubKeyHex,
-        });
+        const pubKeyEcdsa = new KEYUTIL.getKey(pubKeyPem);
         if (!pubKeyEcdsa.verifyHex(sessionId, signature, pubKeyHex)) {
           throw new Error("the signature does not match the public key");
         }
@@ -145,9 +146,7 @@ export class WsIdentityServer {
           socket as net.Socket,
           head as Buffer, (webSocket) => {
             const wsClientOpts: WSClientOpts = {
-              pubKeyHex,
               webSocket,
-              curve,
               pubKeyEcdsa,
               logLevel: opts.logLevel,
             };
@@ -206,7 +205,7 @@ export class WsIdentityServer {
     const client = this.clients[sessionId] as WebSocketClient;
     let err;
     if (client.constructor.name !== "WebSocketClient"){
-      err = `${fnTag} not client connected for sessionId ${sessionId}`
+      err = `${fnTag} no client connected for sessionId ${sessionId}`
     }
     else if (
       !client.pubKeyEcdsa.verifyHex(sessionId, signature, client.pubKeyHex)
@@ -214,7 +213,6 @@ export class WsIdentityServer {
       err = `${fnTag} the signature does not match the public key for sessionId ${sessionId}`
     }
     if(err){  
-      this.log.error(err);
       throw new Error(err);
     }
     return client;

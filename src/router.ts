@@ -24,18 +24,14 @@ export class WsIdentityRouter {
         this.log = LoggerProvider.getOrCreate({ 
             label: this.className, level: opts.logLevel 
         });
-        const auth = async (req: Request, res: Response, next) => {    
-            const sessionId= req.header('X-SessionId');
-            const signature= req.header('X-Signature');
+        const auth = async (req: Request, res: Response, next) => {  
+            const sessionId= req.header('x-session-id');
+            const signature= req.header('x-signature');
             if (!signature && !sessionId) {
                 return res.sendStatus(403);
             } 
-            try {
-                (req as any).client = wsIdentityServer.getClient(sessionId, signature);
-                next();
-            } catch (error) {
-                return res.sendStatus(403);
-            }
+            (req as any).client = wsIdentityServer.getClient(sessionId, signature);
+            next();
         };        
         const wsIdentityServerOpts: WsIdentityServerOpts = {
             path: process.env.WEB_SOCKET_IDENTITY_PATH,
@@ -55,11 +51,11 @@ export class WsIdentityRouter {
                 logLevel: opts.logLevel
             });
         opts.app.use(
-            '/v1/identity/session',
+            '/v1/session',
             wsSessionRouter.router,
         );
         opts.app.use(
-            '/v1/identity/client',
+            '/v1/identity',
             auth,
             wsClientRouter.router,
         );
