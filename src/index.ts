@@ -1,4 +1,4 @@
-export { 
-    WsIdentityServer,
-    WsIdentityServerOpts, 
-} from './ws-identity-server';
+export {
+  WsIdentityServer,
+  WsIdentityServerOpts
+} from './ws-identity-server'
