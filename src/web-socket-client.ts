@@ -24,7 +24,7 @@ export class WebSocketClient {
   private readonly log: Logger;
   private readonly webSocket: WebSocket;
   private digestQueue: Buffer[] = []; // Array of Digests to queue signing requests in series
-  private queueI =0;
+  private queueI = 0;
   constructor (opts: WSClientOpts) {
     this.log = LoggerProvider.getOrCreate({
       label: 'WebSocketClient',
@@ -43,54 +43,57 @@ export class WebSocketClient {
   async sign (digest: Buffer): Promise<Buffer> {
     const fnTag = `${this.className}#sign`
     const { pubKeyHex, pubKeyEcdsa, webSocket, log } = this
-    let { digestQueue, queueI } = this
     log.debug(
       `${fnTag} send digest for pub-key ${this.keyName}: digest-size = ${digest.length}`
     )
-    if (digestQueue[queueI]) {
-      log.error(`${fnTag} digest is processing in queue at index ${queueI}, signature not sent`)
-      return
-      // TODO handle parrallel signature requests?
-      // do we expect the client to return signatures in different order than received?
-      // this can be achieved by sending and returning the queueI in the messae
-    }
-    if (webSocket.readyState !== 1) {
-      log.error(`ws connection is not open, current state is ${this.webSocket.readyState}`)
-    }
-    // add digest queue and increment index
-    digestQueue.push(digest)
-    queueI += 1
-
-    return new Promise(function (resolve) {
-      // const message:WsWalletReq = {digest: digest,index: queueI};
-      webSocket.send(digest, function e () {
-        log.debug(`${fnTag} wait for digest ${queueI} to be signed`)
+    let result;
+    try{
+      if (this.digestQueue[this.queueI]) {
+        throw new Error(`${fnTag} digest is processing in queue at index ${this.queueI}, signature not sent`)
+        // TODO handle parrallel signature requests?
+        // do we expect the client to return signatures in different order than received?
+        // this can be achieved by sending and returning the queueI in the message
+      }
+      if (webSocket.readyState !== 1) {
+        throw new Error(`ws connection is not open, current state is ${this.webSocket.readyState}`)
+      }
+      // add digest queue and increment index
+      this.digestQueue.push(digest)
+      this.queueI += 1
+      let { digestQueue, queueI } = this
+      return new Promise(function (resolve,reject) {
+        // const message:WsWalletReq = {digest: digest,index: queueI};
+        webSocket.send(digest, function e () {
+          log.debug(`${fnTag} wait for digest ${queueI} to be signed`)
+        })
+        webSocket.addEventListener(
+          'message',
+          function incoming (message) { // message: WsWalletRes
+            log.debug(
+              `append signature to digest queue index ${queueI} and mark as processed`
+            )
+            const verified = pubKeyEcdsa.verifyHex(
+              digestQueue[queueI - 1].toString('hex'),
+              message.data.toString('hex'),
+              pubKeyHex
+            )
+            // to save on memory queue elements are now deleted after signature is received
+            delete digestQueue[queueI - 1]
+            if (!verified) {
+              const err = `signature for digest queue index ${queueI} does not match the public key, web socket connection closed`
+              webSocket.close()
+              reject(new Error(err))
+            }
+            resolve(message.data)
+          },
+          // event listener required once for each signature !
+          { once: true }
+        )
       })
-      webSocket.addEventListener(
-        'message',
-        function incoming (message) { // message: WsWalletRes
-          log.debug(
-            `append signature to digest queue index ${queueI} and mark as processed`
-          )
-          const verified = pubKeyEcdsa.verifyHex(
-            digestQueue[queueI - 1].toString('hex'),
-            message.data.toString('hex'),
-            pubKeyHex
-          )
-          // to save on memory queue elements are now deleted after signature is receive
-          delete digestQueue[queueI - 1]
-          if (!verified) {
-            const err = `signature for digest queue index ${queueI} does not match the public key, web socket connection closed`
-            webSocket.close()
-            // throw new Error(err)
-            log.error(err)
-          }
-          resolve(message.data)
-        },
-        // event listener required once for each signature !
-        { once: true }
-      )
-    })
+      // to save on memory queue elements are now deleted after signature is receive
+    }catch(error){
+      this.log.error(error)
+    }
   }
 
   public close () {
