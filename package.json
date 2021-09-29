@@ -1,7 +1,7 @@
 {
   "name": "ws-identity",
   "author": "",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "",
   "main": "./dist/src/index.js",
   "module": "./dist/src/index.js",

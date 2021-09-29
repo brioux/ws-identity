@@ -183,7 +183,7 @@ export class WsIdentityServer {
         log.info(
           `${fnTag} client closed for sessionId ${sessionId} and pub-key-hex ${client?.keyName}`
         )
-        clients[sessionId] = null
+        delete clients[sessionId]
       }
     })
   }
