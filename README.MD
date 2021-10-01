@@ -5,7 +5,7 @@ An express.js app to access cryptophic signing capabilites over web-socket.
 ## WS-X.509 identity provider
 The ws-identity server supports X.509 certificates issued by a Certificate Authority (CA) where correspoinding private keys are stored offline in an external wallet. The server connects identities with a distributed network (e.g., hyperledger fabric). This could include:
 * an IoT device
-* an auditor or human authority
+* an auditor
 
  [ws-identity-client](https://github.com/brioux/ws-identity-client) setups the backend between ws-identity server and fabric network. A WS-X.509 identity provider is setup within the [cactus-plugin-ledger-connector-fabric](https://github.com/hyperledger/cactus/pull/1333).
 
