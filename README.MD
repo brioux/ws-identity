@@ -14,7 +14,6 @@ ws-identity server configuration:
 export interface IWebSocketConfig {
   endpoint: string; // ws-identity server endpoint, e.g., http://[ip]:[port]
   pathPrefix: string; // a particular path to call on the server path
-  // 
 }
 ```
 pathPrefix: 
