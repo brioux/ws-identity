@@ -6,15 +6,15 @@ import {
 import WebSocket from 'ws'
 import { KEYUTIL } from 'jsrsasign'
 import { URL } from 'url'
+import path from 'path'
 import { randomBytes } from 'crypto'
 import http, { Server } from 'http'
 import net from 'net'
 import {
   WebSocketClient,
   WSClientOpts
-} from './web-socket-client'
+} from './client'
 import { getClientIp } from '@supercharge/request-ip'
-import path from 'path'
 
 export enum ECCurveLong {
   p256 = 'secp256r1',
@@ -40,6 +40,7 @@ export interface WsIdentityServerOpts {
 interface WebSocketTicket {
   pubKeyHex: string;
   ip: string;
+  wsMount: string;
 }
 
 interface IWebSocketClients {
@@ -53,7 +54,7 @@ export class WsIdentityServer {
   private clients: IWebSocketClients = {};
   private readonly log: Logger;
   private readonly webSocketServer: WebSocket.Server;
-  public readonly hostAddress: any;
+  private readonly wsUrl: URL;
 
   constructor (private readonly opts: WsIdentityServerOpts) {
     const fnTag = `${this.className}#constructor`
@@ -61,96 +62,79 @@ export class WsIdentityServer {
       level: opts.logLevel || 'INFO',
       label: this.className
     })
-    this.opts.wsMount = opts.wsMount || '/sessions'
     this.webSocketServer = new WebSocket.Server({
       noServer: true,
       path: opts.wsMount
       // clientTracking: true,
     })
-    const socketAddr = this.opts.server.address() as any
-    let baseAddr
-    if (socketAddr?.family === 'IPv6') {
-      baseAddr = `[${socketAddr?.address}]:${socketAddr?.port}`
-    } else {
-      baseAddr = `${socketAddr?.address}:${socketAddr?.port}`
-    }
-    this.hostAddress = `ws://${path.join(baseAddr, this.opts.wsMount)}`
-    this.log.debug(
-      `${fnTag} setup ws-identity-server at ${this.hostAddress}`
-    )
-
     const { log, clients, webSocketServer } = this
     opts.server.on('upgrade', function upgrade (
       request: http.IncomingMessage,
       socket: net.Socket,
       head: Buffer
     ) {
-      console.log(request.url)
       log.debug(
         `${fnTag} validate server upgrade for ${request.url} before connecting web-socket`
       )
       try {
-        // const { path, pathname } = parse(request.url as string);
-        let base
-        if (!request.url.includes('://')) { base = `http://${baseAddr}` }
-        const url = new URL(request.url, base)
-        // const params = path?.split("?")[1];
-        if (opts.wsMount && url.pathname !== opts.wsMount) {
-          throw new Error(
-            `incoming web-socket to ${url.pathname}, required path is ${opts.wsMount}`
-          )
-        }
         const headers = request.headers
-        const connectionParams = url.searchParams
-        if (connectionParams) {
-          log.debug(
-            `${fnTag} params received by new web-socket client: ${connectionParams}`
-          )
-        }
         const sessionId = headers['x-session-id'] as string
         const signature = headers['x-signature'] as string
         const pubKeyPem = JSON.parse(headers['x-pub-key-pem'] as string)
 
-        const paramErrs = []
         if (!sessionId) {
-          paramErrs.push('header \'session-id\' not provided')
+          throw new Error('header \'session-id\' not provided')
         }
         if (!signature) {
-          paramErrs.push('header \'signature\' not provided')
+          throw new Error('header \'signature\' not provided')
         }
         if (!pubKeyPem) {
-          paramErrs.push('header \'pub-key-pem\' not provided')
-        }
-        if (paramErrs.length > 0) {
-          throw new Error(paramErrs.join('\r\n'))
+          throw new Error('header \'pub-key-pem\' not provided')
         }
 
         const client = clients[sessionId] as WebSocketTicket
         if (!client) {
           throw new Error(
-            `server is not waiting for client with sessionId ${sessionId} `
-          )
-        } else if (client.constructor.name === 'WebSocketClient') {
-          throw new Error(
-            `a client has already been opened for sessionId ${sessionId}`
+            `no ticket open for client with sessionId ${sessionId} `
           )
         }
+        if (client.constructor.name === 'WebSocketClient') {
+          throw new Error(
+            `a connection has already been opened for sessionId ${sessionId}`
+          )
+        }
+        const url = new URL(path.join(request.headers.origin, request.url))
+
+        log.debug(`${fnTag} check that request matches ws mount path ${client.wsMount}`)
+
+        if (url.pathname !== client.wsMount) {
+          throw new Error(
+            `incorrect path ${url.pathname} for connection to sessionId ${sessionId}`
+          )
+        }
+        const connectionParams = url.searchParams
+        if (connectionParams) {
+          log.debug(
+            `${fnTag} params received: ${connectionParams}`
+          )
+        }
+
         const clientIp = getClientIp(request)
         if (client.ip !== clientIp) {
           throw new Error(
-            `incoming connectionfrom ip ${clientIp}, but expected ip is ${client.ip}`
+            `the IP of the incomming clinet ${clientIp} does not match the registered IP ${client.ip}`
           )
         }
-        const pubKeyHex: string = client.pubKeyHex
-        log.debug(
-          `${fnTag} build public ECDSA curve using the pub-key-hex ${pubKeyHex.substring(
-            0,
-            12
-          )}... to verify the sessionId signature`
+
+        log.info(
+          `${fnTag} build public ECDSA curve to verify signature for session ID ${sessionId}`
         )
+
+        const pubKeyHex: string = client.pubKeyHex
+        const shortHex = `${pubKeyHex.substring(0, 12)}...}`
         const pubKeyEcdsa = KEYUTIL.getKey(pubKeyPem)
         if (!pubKeyEcdsa.verifyHex(sessionId, signature, pubKeyHex)) {
-          throw new Error('the signature does not match the public key')
+          throw new Error(`the signature does not match the public key ${shortHex}`)
         }
 
         webSocketServer.handleUpgrade(
@@ -167,10 +151,10 @@ export class WsIdentityServer {
           }
         )
       } catch (error) {
-        socket.write(`HTTP/1.1 401 Unauthorized\r\n\r\n${error}`)
-        // throw new Error
+        socket.write(`${error}`)
+        // socket.write(`${error}`)
         log.error(`${fnTag} incoming connection denied: ${error}`)
-        socket.destroy()
+        // socket.destroy()
       }
     })
     webSocketServer.on('connection', function connection (
@@ -181,7 +165,7 @@ export class WsIdentityServer {
       log.info(`session ${sessionId} in progress for ${client?.keyName}`)
       webSocket.onclose = function () {
         log.info(
-          `${fnTag} client closed for sessionId ${sessionId} and pub-key-hex ${client?.keyName}`
+          `${fnTag} client removed for sessionId ${sessionId} and pub-key-hex ${client?.keyName}`
         )
         delete clients[sessionId]
       }
@@ -191,17 +175,25 @@ export class WsIdentityServer {
   /**
    * @description create a unique sessionId for web socket connection for a given public key hex
    */
-  public newSessionId (pubKeyHex: string, clientIp: string):string {
+  public newSessionId (pubKeyHex: string, clientIp: string):
+    {sessionId: string, wsMount: string } {
     const fnTag = `${this.className}#new-session-id`
     const sessionId = randomBytes(8).toString('hex')
-    this.clients[sessionId] = { pubKeyHex, ip: clientIp } as WebSocketTicket
     this.log.debug(
       `${fnTag} assign new session id ${sessionId} to public key ${pubKeyHex.substring(
         0,
         12
       )}...`
     )
-    return sessionId
+    // TODO create unique mount path with dedicated router for the new sessionId
+    // and send the url in the response
+    this.clients[sessionId] = {
+      pubKeyHex,
+      ip: clientIp,
+      wsMount: this.opts.wsMount
+    } as WebSocketTicket
+
+    return { sessionId, wsMount: this.opts.wsMount }
   }
 
   public close () {
@@ -232,6 +224,9 @@ export class WsIdentityServer {
     return client
   }
 
+  /* Public function previously used for testing
+      Not to be used in production!!!
+  */
   public async waitForSocketClient (
     sessionId: string,
     address?: any

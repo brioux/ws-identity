@@ -4,13 +4,14 @@ import { Application, Router, Request, Response } from 'express'
 import {
   WsIdentityServer,
   WsIdentityServerOpts
-} from './ws-identity-server'
+} from './server'
 import { WsSessionRouter } from './routers/session'
 import { WsClientRouter } from './routers/client'
 export interface WsIdentityRouterOpts {
     logLevel?: LogLevelDesc;
     app: Application;
     server: any;
+    wsMount?: string;
 }
 
 export class WsIdentityRouter {
@@ -32,23 +33,26 @@ export class WsIdentityRouter {
         (req as any).client = wsIdentityServer.getClient(sessionId, signature)
         next()
       }
+
       const wsIdentityServerOpts: WsIdentityServerOpts = {
-        wsMount: process.env.WS_IDENTITY_PATH,
+        wsMount: opts.wsMount,
         server: opts.server,
         logLevel: opts.logLevel
       }
       const wsIdentityServer = new WsIdentityServer(wsIdentityServerOpts)
 
       const wsSessionRouter =
-            new WsSessionRouter({
-              logLevel: opts.logLevel,
-              wsIdentityServer: wsIdentityServer
-            })
+        new WsSessionRouter({
+          logLevel: opts.logLevel,
+          wsIdentityServer: wsIdentityServer
+        })
+
       const wsClientRouter =
-            new WsClientRouter({
-              wsIdentityServer: wsIdentityServer,
-              logLevel: opts.logLevel
-            })
+        new WsClientRouter({
+          wsIdentityServer: wsIdentityServer,
+          logLevel: opts.logLevel
+        })
+
       opts.app.use(
         '/v1/session',
         wsSessionRouter.router

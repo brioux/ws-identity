@@ -2,7 +2,7 @@
 import { Logger, LoggerProvider, LogLevelDesc } from '@hyperledger/cactus-common'
 import { Router, Request, Response } from 'express'
 import { validationResult, body } from 'express-validator'
-import { WsIdentityServer } from '../ws-identity-server'
+import { WsIdentityServer } from '../server'
 import { getClientIp } from '@supercharge/request-ip'
 export interface WsIdentityRouterOpts {
     logLevel: LogLevelDesc;
@@ -41,7 +41,7 @@ export class WsSessionRouter {
       try {
         const clientIp = getClientIp(req)
         const resp = this.opts.wsIdentityServer.newSessionId(req.body.pubKeyHex, clientIp)
-        return res.status(201).json(resp)
+        return res.status(201).json(JSON.stringify(resp))
       } catch (error) {
         return res.status(409).json({
           msg: error.message

@@ -46,7 +46,7 @@ npm run docker
 ```
 
 ## start server
-A prebuild docker image can be downloaded from docker hub
+A prebuilt docker image can be downloaded from docker hub
 ```docker
 docker pull brioux/ws-identity:0.0.6
 ```

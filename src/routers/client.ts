@@ -3,8 +3,8 @@ import { Logger, LoggerProvider, LogLevelDesc } from '@hyperledger/cactus-common
 import { Router, Request, Response } from 'express'
 import { validationResult, body } from 'express-validator'
 import { KEYUTIL } from 'jsrsasign'
-import { WsIdentityServer } from '../ws-identity-server'
-import { WebSocketClient } from '../web-socket-client'
+import { WsIdentityServer } from '../server'
+import { WebSocketClient } from '../client'
 
 export interface WsClientRouterOpts {
     logLevel: LogLevelDesc;
@@ -71,7 +71,7 @@ export class WsClientRouter {
         const resp = KEYUTIL.getPEM((req as any).client.pubKeyEcdsa)
         return res.status(200).json(resp)
       } catch (error) {
-        console.log(error)
+        this.log.debug(`${error}`)
         return res.status(409).json({
           msg: error.message
         })

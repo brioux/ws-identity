@@ -1,4 +1,8 @@
 export {
   WsIdentityServer,
   WsIdentityServerOpts
-} from './ws-identity-server'
+} from './server'
+export {
+  WsIdentityRouter,
+  WsIdentityRouterOpts
+} from './router'

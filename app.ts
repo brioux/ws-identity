@@ -1,3 +1,4 @@
+import { config } from 'dotenv';
 import express, { Application, Request, Response, NextFunction } from "express";
 import bodyParser from "body-parser";
 import { WsIdentityRouter } from './src/router';
@@ -9,28 +10,41 @@ app.use(bodyParser.urlencoded({ extended: true }))
 app.get("/", (req: Request, res: Response) => {
   res.send("TS App is Running")
 });
-
+config();
 const port = process.env.WEB_SOCKET_SERVER_PORT || '8700';
 
-const credentials = {
-  key: process.env.SSL_KEY,
-  cert: process.env.SSL_CERT
-};
-let server = http.createServer(app);
+
+
+
+let protocol = 'http:'
+let server
 try{
-    //server = https.createServer(credentials, app);
-    
+  if(process.env.SSL_KEY && process.env.SSL_CERT){
+    const credentials = {
+      key: process.env.SSL_KEY,
+      cert: process.env.SSL_CERT
+    };
+    server = https.createServer(credentials, app);  
+    protocol = 'https:'
+  }else{
+     server = http.createServer(app);
+  }
 }catch(error){
     throw new Error(`error starting server: ${error}`);
 }
 
 server.listen(port, () => {
-  console.log(`server is running on PORT ${port}`)
+  console.log(`WS-IDENTITY server open at ${protocol}//localhost:${port}`)
 })
+
+const wsMount=process.env.WS_IDENTITY_PATH || '/sessions';
+
 new WsIdentityRouter({
-    app: app,
-    server: server,
-    logLevel: 'debug'});
+  app,
+  server,
+  wsMount,
+  logLevel: 'debug'
+});
 
 app._router.stack.forEach(print.bind(null, []))
 

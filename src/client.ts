@@ -46,13 +46,12 @@ export class WebSocketClient {
     log.debug(
       `${fnTag} send digest for pub-key ${this.keyName}: digest-size = ${digest.length}`
     )
-    let result;
-    try{
+    try {
       if (this.digestQueue[this.queueI]) {
         throw new Error(`${fnTag} digest is processing in queue at index ${this.queueI}, signature not sent`)
         // TODO handle parrallel signature requests?
         // do we expect the client to return signatures in different order than received?
-        // this can be achieved by sending and returning the queueI in the message
+        // this could be achieved by sending and returning the queueI in the message
       }
       if (webSocket.readyState !== 1) {
         throw new Error(`ws connection is not open, current state is ${this.webSocket.readyState}`)
@@ -60,8 +59,8 @@ export class WebSocketClient {
       // add digest queue and increment index
       this.digestQueue.push(digest)
       this.queueI += 1
-      let { digestQueue, queueI } = this
-      return new Promise(function (resolve,reject) {
+      const { digestQueue, queueI } = this
+      return new Promise(function (resolve, reject) {
         // const message:WsWalletReq = {digest: digest,index: queueI};
         webSocket.send(digest, function e () {
           log.debug(`${fnTag} wait for digest ${queueI} to be signed`)
@@ -91,7 +90,7 @@ export class WebSocketClient {
         )
       })
       // to save on memory queue elements are now deleted after signature is receive
-    }catch(error){
+    } catch (error) {
       this.log.error(error)
     }
   }
